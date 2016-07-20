@@ -1,21 +1,27 @@
 package com.sam_chordas.android.stockhawk.service;
 
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.os.RemoteException;
 import android.util.Log;
+
 import com.google.android.gms.gcm.GcmNetworkManager;
 import com.google.android.gms.gcm.GcmTaskService;
 import com.google.android.gms.gcm.TaskParams;
 import com.sam_chordas.android.stockhawk.data.QuoteColumns;
 import com.sam_chordas.android.stockhawk.data.QuoteProvider;
 import com.sam_chordas.android.stockhawk.rest.Utils;
+import com.sam_chordas.android.stockhawk.widget.StockWidgetProvider;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
+
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -62,7 +68,7 @@ public class StockTaskService extends GcmTaskService{
     } catch (UnsupportedEncodingException e) {
       e.printStackTrace();
     }
-    if (params.getTag().equals("init") || params.getTag().equals("periodic")){
+    if (params.getTag().equals("init") || params.getTag().equals("periodic")) {
       isUpdate = true;
       initQueryCursor = mContext.getContentResolver().query(QuoteProvider.Quotes.CONTENT_URI,
           new String[] { "Distinct " + QuoteColumns.SYMBOL }, null,
@@ -110,6 +116,7 @@ public class StockTaskService extends GcmTaskService{
 
     if (urlStringBuilder != null){
       urlString = urlStringBuilder.toString();
+      Log.i(LOG_TAG,"urlString "+urlString);
       try{
         getResponse = fetchData(urlString);
         result = GcmNetworkManager.RESULT_SUCCESS;
@@ -122,7 +129,8 @@ public class StockTaskService extends GcmTaskService{
                 null, null);
           }
           mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
-              Utils.quoteJsonToContentVals(getResponse));
+              Utils.quoteJsonToContentVals(mContext, getResponse));
+            updateWidgets();
         }catch (RemoteException | OperationApplicationException e){
           Log.e(LOG_TAG, "Error applying batch insert", e);
         }
@@ -133,5 +141,19 @@ public class StockTaskService extends GcmTaskService{
 
     return result;
   }
+
+    public void updateWidgets() {
+        Log.i(LOG_TAG,"broadcasting to update widgets");
+        // Setting the package ensures that only components in our app will receive the broadcast
+//        Intent dataUpdatedIntent = new Intent(StockWidgetProvider.ACTION_DATA_UPDATED)
+//                .setPackage(mContext.getPackageName());
+//        mContext.sendBroadcast(dataUpdatedIntent);
+      ComponentName name = new ComponentName(mContext, StockWidgetProvider.class);
+      int[] ids = AppWidgetManager.getInstance(mContext).getAppWidgetIds(name);
+      Intent intent = new Intent(mContext, StockWidgetProvider.class);
+      intent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+      intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
+      mContext.sendBroadcast(intent);
+    }
 
 }
