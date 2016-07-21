@@ -6,12 +6,10 @@ import android.content.ContentProviderOperation;
 import android.content.Context;
 import android.content.CursorLoader;
 import android.content.Loader;
-import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
-import android.os.RemoteException;
 import android.support.annotation.Nullable;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
@@ -186,6 +184,13 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
                             super.onDeleteComplete(token, cookie, result);
                             Log.i(LOG_TAG, "Deleted " + result +" records successfully");
                         }
+
+                        @Override
+                        protected void onBulkInsertComplete(int token, Object cookie, int result) {
+                            super.onBulkInsertComplete(token, cookie, result);
+                            Log.i(LOG_TAG, "BUlk inserted ");
+//
+                        }
                     };
                     // Construct query and execute
                     queryHandler.startDelete(
@@ -222,15 +227,19 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
                         }
                     }
 
+                    queryHandler.startBulkInsert(3, null,
+                            QuoteProvider.AUTHORITY,
+                            batchHistOperations);
 //                    mContext.getContentResolver().delete(
 //                            QuoteProvider.History.CONTENT_URI,
 //                            null, null);
-                    try {
-                        mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
-                                batchHistOperations);
-                    } catch (RemoteException | OperationApplicationException e) {
-                        Log.e(LOG_TAG, "Error applying batch insert", e);
-                    }
+//                    try {
+//                        mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
+//                                batchHistOperations);
+//
+//                    } catch (RemoteException | OperationApplicationException e) {
+//                        Log.e(LOG_TAG, "Error applying batch insert", e);
+//                    }
                 } catch (NullPointerException e) {
                     if (response.code() == 401) {
                         Log.i(LOG_TAG, "Unauthenticated");
