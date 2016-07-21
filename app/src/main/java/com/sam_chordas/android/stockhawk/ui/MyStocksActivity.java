@@ -83,6 +83,7 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
             // Run the initialize task service so that some stocks appear upon an empty database
             mServiceIntent.putExtra("tag", "init");
             if (isConnected) {
+                Log.i(LOG_TAG,"starting service for init");
                 startService(mServiceIntent);
             } else {
                 networkToast();

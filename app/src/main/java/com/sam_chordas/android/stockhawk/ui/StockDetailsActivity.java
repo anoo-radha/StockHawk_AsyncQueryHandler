@@ -2,6 +2,7 @@ package com.sam_chordas.android.stockhawk.ui;
 
 
 import android.app.LoaderManager;
+import android.content.ContentProviderOperation;
 import android.content.Context;
 import android.content.CursorLoader;
 import android.content.Loader;
@@ -35,6 +36,7 @@ import com.sam_chordas.android.stockhawk.async_retrofit.StockHistory;
 import com.sam_chordas.android.stockhawk.data.HistoryColumns;
 import com.sam_chordas.android.stockhawk.data.QuoteColumns;
 import com.sam_chordas.android.stockhawk.data.QuoteProvider;
+import com.sam_chordas.android.stockhawk.rest.AsyncQueryHandler;
 import com.sam_chordas.android.stockhawk.rest.Utils;
 
 import java.util.ArrayList;
@@ -62,6 +64,8 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
     private Cursor mCursor;
     private LineChart lineChartView;
     private ProgressWheel progressView;
+    private ArrayList<ContentProviderOperation> batchHistOperations = new ArrayList<>();
+    private List<Quote> quote;
     private TextView err_txt;
 
     @Override
@@ -137,7 +141,7 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
         //getting stock data since a week(no data for sat & sun)
         String startDate = Utils.getFormattedDate(daysSinceToday);
         //getting today's date for end date
-        String endDate = Utils.getFormattedDate(0);
+        final String endDate = Utils.getFormattedDate(0);
         Log.i(LOG_TAG, "start_date  " + startDate + "  end_date " + endDate);
         String query = "select * from yahoo.finance.historicaldata where symbol = \"" + symbol
                 + "\" and startDate = \"" + startDate + "\" and endDate = \"" + endDate + "\"";
@@ -157,14 +161,73 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
                     StockHistory history = response.body();
                     Query query = history.getQuery();
                     Results results = query.getResults();
-                    List<Quote> quote = results.getQuote();
+                    quote = results.getQuote();
                     Log.i(LOG_TAG, "symbol is " + quote.get(0).getSymbol());
-                    mContext.getContentResolver().delete(
+                    // Using AsyncQueryHandler object for querying content provider in the background,
+                    // instead of from the UI thread
+                    AsyncQueryHandler queryHandler = new AsyncQueryHandler(getContentResolver()) {
+                        @Override
+                        protected void onQueryComplete(int token, Object cookie, Cursor cursor) {
+                            super.onQueryComplete(token, cookie, cursor);
+                            if ((cursor!=null) && (cursor.getCount() != 0) ){
+                                cursor.moveToFirst();
+                                ContentProviderOperation.Builder builder = ContentProviderOperation.newInsert(
+                                        QuoteProvider.History.CONTENT_URI);
+                                builder.withValue(HistoryColumns.SYMBOL, quote.get(0).getSymbol());
+                                float price = Float.parseFloat(cursor.getString(cursor.getColumnIndex(QuoteColumns.BIDPRICE)));
+                                builder.withValue(HistoryColumns.VALUE, price);
+                                builder.withValue(HistoryColumns.DATE, endDate);
+                                batchHistOperations.add(builder.build());
+                            }
+                        }
+
+                        @Override
+                        protected void onDeleteComplete(int token, Object cookie, int result) {
+                            super.onDeleteComplete(token, cookie, result);
+                            Log.i(LOG_TAG, "Deleted " + result +" records successfully");
+                        }
+                    };
+                    // Construct query and execute
+                    queryHandler.startDelete(
+                            1, null,
                             QuoteProvider.History.CONTENT_URI,
-                            null, null);
+                            null, null
+                    );
+
+
+
+                    if(!(quote.get(0).getDate()).equals(endDate)){
+                        Log.i(LOG_TAG,"adding todays stock from quote db");
+                        queryHandler.startQuery(2, null,
+                                QuoteProvider.Quotes.withSymbol(quote.get(0).getSymbol()),
+                                new String[]{QuoteColumns.BIDPRICE},
+                                QuoteColumns.ISCURRENT + "= ?",
+                                new String[]{"1"},
+                                null);
+//                        Cursor cursor = c.getContentResolver().query(
+//                                QuoteProvider.Quotes.withSymbol(quote.get(0).getSymbol()),
+//                                new String[]{QuoteColumns.BIDPRICE},
+//                                QuoteColumns.ISCURRENT + "= ?",
+//                                new String[]{"1"},
+//                                null);
+                    }
+                    for (Quote q : quote) {
+                        if (q != null) {
+                            ContentProviderOperation.Builder builder = ContentProviderOperation.newInsert(
+                                    QuoteProvider.History.CONTENT_URI);
+                            builder.withValue(HistoryColumns.SYMBOL, q.getSymbol());
+                            builder.withValue(HistoryColumns.VALUE, Float.parseFloat(q.getClose()));
+                            builder.withValue(HistoryColumns.DATE, q.getDate());
+                            batchHistOperations.add(builder.build());
+                        }
+                    }
+
+//                    mContext.getContentResolver().delete(
+//                            QuoteProvider.History.CONTENT_URI,
+//                            null, null);
                     try {
                         mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
-                                Utils.quoteListToHistoryContents(mContext, quote));
+                                batchHistOperations);
                     } catch (RemoteException | OperationApplicationException e) {
                         Log.e(LOG_TAG, "Error applying batch insert", e);
                     }

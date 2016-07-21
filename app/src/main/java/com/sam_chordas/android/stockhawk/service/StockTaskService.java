@@ -128,6 +128,7 @@ public class StockTaskService extends GcmTaskService{
             mContext.getContentResolver().update(QuoteProvider.Quotes.CONTENT_URI, contentValues,
                 null, null);
           }
+          Log.i(LOG_TAG,"getresponse "+getResponse);
           mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
               Utils.quoteJsonToContentVals(mContext, getResponse));
             updateWidgets();
