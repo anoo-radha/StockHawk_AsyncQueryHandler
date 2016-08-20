@@ -3,6 +3,7 @@ package com.sam_chordas.android.stockhawk.ui;
 
 import android.app.LoaderManager;
 import android.content.ContentProviderOperation;
+import android.content.ContentProviderResult;
 import android.content.Context;
 import android.content.CursorLoader;
 import android.content.Loader;
@@ -38,6 +39,7 @@ import com.sam_chordas.android.stockhawk.rest.AsyncQueryHandler;
 import com.sam_chordas.android.stockhawk.rest.Utils;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
@@ -135,11 +137,23 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
 
     /* Getting the stock history using Retrofit Service*/
     public void getHistoricData(int daysSinceToday) {
-
+        final String endDate;
         //getting stock data since a week(no data for sat & sun)
         String startDate = Utils.getFormattedDate(daysSinceToday);
         //getting today's date for end date
-        final String endDate = Utils.getFormattedDate(0);
+        int day = Calendar.getInstance().get(Calendar.DAY_OF_WEEK);
+        switch (day) {
+            case Calendar.SUNDAY:
+                endDate = Utils.getFormattedDate(2);
+                break;
+            case Calendar.SATURDAY:
+                endDate = Utils.getFormattedDate(1);
+                break;
+            default:
+                endDate = Utils.getFormattedDate(0);
+                break;
+        }
+
         Log.i(LOG_TAG, "start_date  " + startDate + "  end_date " + endDate);
         String query = "select * from yahoo.finance.historicaldata where symbol = \"" + symbol
                 + "\" and startDate = \"" + startDate + "\" and endDate = \"" + endDate + "\"";
@@ -186,7 +200,7 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
                         }
 
                         @Override
-                        protected void onBulkInsertComplete(int token, Object cookie, int result) {
+                        protected void onBulkInsertComplete(int token, Object cookie, ContentProviderResult[] result) {
                             super.onBulkInsertComplete(token, cookie, result);
                             Log.i(LOG_TAG, "BUlk inserted ");
 //
@@ -286,9 +300,9 @@ public class StockDetailsActivity extends AppCompatActivity implements LoaderMan
 
         lineChartView.setData(data); // set the data and list of lables into chart
         //to set the zoom
-        lineChartView.setAutoScaleMinMaxEnabled(true);
-        lineChartView.getAxisLeft().setStartAtZero(false);
-        lineChartView.getAxisRight().setStartAtZero(false);
+//        lineChartView.setAutoScaleMinMaxEnabled(true);
+//        lineChartView.getAxisLeft().setStartAtZero(false);
+//        lineChartView.getAxisRight().setStartAtZero(false);
         lineChartView.invalidate();
         String desc = String.format(Locale.US, getString(R.string.chart_view_desc), name, range);
         lineChartView.setContentDescription(desc);

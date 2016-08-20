@@ -3,13 +3,10 @@ package com.sam_chordas.android.stockhawk.rest;
 import android.content.ContentProviderOperation;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.sam_chordas.android.stockhawk.R;
-import com.sam_chordas.android.stockhawk.async_retrofit.Quote;
-import com.sam_chordas.android.stockhawk.data.HistoryColumns;
 import com.sam_chordas.android.stockhawk.data.QuoteColumns;
 import com.sam_chordas.android.stockhawk.data.QuoteProvider;
 
@@ -19,7 +16,6 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import java.util.Locale;
 
 /**
@@ -31,50 +27,12 @@ public class Utils {
 
     public static boolean showPercent = true;
 
-    public static ArrayList quoteListToHistoryContents(Context c, List<Quote> quote) {
-        ArrayList<ContentProviderOperation> batchHistOperations = new ArrayList<>();
-        String todayDate = Utils.getFormattedDate(0);
-        if(!(quote.get(0).getDate()).equals(todayDate)){
-            Log.i(LOG_TAG,"adding todays stock from quote db");
-            Cursor cursor = c.getContentResolver().query(
-                    QuoteProvider.Quotes.withSymbol(quote.get(0).getSymbol()),
-                    new String[]{QuoteColumns.BIDPRICE},
-                    QuoteColumns.ISCURRENT + "= ?",
-                    new String[]{"1"},
-                    null);
-            if ((cursor!=null) && (cursor.getCount() != 0) ){
-                cursor.moveToFirst();
-                ContentProviderOperation.Builder builder = ContentProviderOperation.newInsert(
-                        QuoteProvider.History.CONTENT_URI);
-                builder.withValue(HistoryColumns.SYMBOL, quote.get(0).getSymbol());
-                float price = Float.parseFloat(cursor.getString(cursor.getColumnIndex(QuoteColumns.BIDPRICE)));
-                builder.withValue(HistoryColumns.VALUE, price);
-                builder.withValue(HistoryColumns.DATE, todayDate);
-                Log.i(LOG_TAG,price+ " "+todayDate);
-                batchHistOperations.add(builder.build());
-            }
-            cursor.close();
-        }
-        for (Quote q : quote) {
-            if (q != null) {
-                ContentProviderOperation.Builder builder = ContentProviderOperation.newInsert(
-                        QuoteProvider.History.CONTENT_URI);
-                builder.withValue(HistoryColumns.SYMBOL, q.getSymbol());
-                builder.withValue(HistoryColumns.VALUE, Float.parseFloat(q.getClose()));
-                builder.withValue(HistoryColumns.DATE, q.getDate());
-                batchHistOperations.add(builder.build());
-            }
-        }
-        return batchHistOperations;
-    }
-
     public static ArrayList quoteJsonToContentVals(Context c, String JSON) {
         ArrayList<ContentProviderOperation> batchOperations = new ArrayList<>();
         JSONObject jsonObject = null;
         JSONArray resultsArray = null;
         try {
             jsonObject = new JSONObject(JSON);
-//        setStockStatus(c, c.getString(R.string.stock_status_valid));
             if (jsonObject != null && jsonObject.length() != 0) {
                 jsonObject = jsonObject.getJSONObject("query");
                 int count = Integer.parseInt(jsonObject.getString("count"));

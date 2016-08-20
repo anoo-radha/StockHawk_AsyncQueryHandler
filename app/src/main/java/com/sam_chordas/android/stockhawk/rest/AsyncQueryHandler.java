@@ -1,6 +1,7 @@
 package com.sam_chordas.android.stockhawk.rest;
 
 import android.content.ContentProviderOperation;
+import android.content.ContentProviderResult;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.OperationApplicationException;
@@ -232,6 +233,8 @@ public abstract class AsyncQueryHandler extends Handler {
         args.batchOperations = new ArrayList<ContentProviderOperation>(batchOperations);
         args.cookie = cookie;
         msg.obj = args;
+
+        mWorkerThreadHandler.sendMessage(msg);
     }
 
     /**
@@ -309,7 +312,7 @@ public abstract class AsyncQueryHandler extends Handler {
     protected void onInsertComplete(int token, Object cookie, Uri uri) {
     }
 
-    protected void onBulkInsertComplete(int token, Object cookie, int result) {
+    protected void onBulkInsertComplete(int token, Object cookie, ContentProviderResult[] result) {
     }
 
     /**
@@ -351,7 +354,7 @@ public abstract class AsyncQueryHandler extends Handler {
                 break;
 
             case EVENT_ARG_BULK_INSERT:
-                onBulkInsertComplete(token, args.cookie, (Integer) args.result);
+                onBulkInsertComplete(token, args.cookie, (ContentProviderResult[]) args.result);
                 break;
 
             case EVENT_ARG_UPDATE:
